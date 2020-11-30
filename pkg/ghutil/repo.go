@@ -45,6 +45,9 @@ func (gc *GithubClient) ListRepos(org string) ([]string, error) {
 	res := make([]string, 0, len(genericList))
 	for _, elem := range genericList {
 		r := elem.(*github.Repository)
+
+		fmt.Println("is forked? ", *r.Fork)
+
 		if r.Archived != nil && !*r.Archived {
 			res = append(res, r.GetName())
 		}
@@ -72,6 +75,88 @@ func (gc *GithubClient) ListBranches(org, repo string) ([]*github.Branch, error)
 	res := make([]*github.Branch, len(genericList))
 	for i, elem := range genericList {
 		res[i] = elem.(*github.Branch)
+	}
+	return res, err
+}
+
+type Repo struct {
+	Org  string
+	Name string
+
+	Fork string
+}
+
+// ListRepos lists repos under org
+func (gc *GithubClient) JoinRepos(fork string, orgs ...string) ([]Repo, error) {
+	forks, err := gc.listRepos(fork)
+	if err != nil {
+		return nil, err
+	}
+
+	// parent to fork
+	ptf := map[string]*github.Repository{}
+	for _, fork := range forks {
+		fmt.Println(fork)
+
+		if fork.Parent != nil {
+			fmt.Print("has parent: ", fork.Parent)
+		}
+
+		if fork.Fork != nil && *fork.Fork && fork.ForksURL != nil && fork.URL != nil {
+			ptf[*fork.ForksURL] = fork
+		}
+	}
+
+	repos := make([]Repo, 0)
+	for _, org := range orgs {
+		orgRepos, err := gc.listRepos(org)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, or := range orgRepos {
+			repo := Repo{
+				Org:  org,
+				Name: or.GetName(),
+				Fork: "",
+			}
+			if fork, found := ptf[*or.URL]; found {
+				repo.Fork = fork.GetName()
+			}
+			repos = append(repos, repo)
+		}
+	}
+	return repos, err
+}
+
+func (gc *GithubClient) listRepos(org string) ([]*github.Repository, error) {
+	repoListOptions := &github.RepositoryListOptions{}
+	genericList, err := gc.depaginate(
+		"listing repos",
+		maxRetryCount,
+		&repoListOptions.ListOptions,
+		func() ([]interface{}, *github.Response, error) {
+			page, resp, err := gc.Client.Repositories.List(ctx, org, repoListOptions)
+			var interfaceList []interface{}
+			if nil == err {
+				for _, repo := range page {
+					interfaceList = append(interfaceList, repo)
+				}
+			}
+			return interfaceList, resp, err
+		},
+	)
+	res := make([]*github.Repository, 0, len(genericList))
+	for _, elem := range genericList {
+		r := elem.(*github.Repository)
+		if r.Archived != nil && !*r.Archived {
+			repo, _, err := gc.Client.Repositories.Get(ctx, org, r.GetName())
+			if err != nil {
+				res = append(res, r)
+			} else {
+				res = append(res, repo)
+			}
+		}
 	}
 	return res, err
 }

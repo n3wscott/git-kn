@@ -18,7 +18,6 @@ package commands
 
 import (
 	"fmt"
-	"github.com/n3wscott/git-kn/pkg/knative"
 	"github.com/spf13/cobra"
 
 	"github.com/n3wscott/git-kn/pkg/config"
@@ -30,29 +29,20 @@ func addListCmd(root *cobra.Command) {
 		Use:   "list",
 		Short: "List the Knative repos.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Config()
-			if err != nil {
-				return err
-			}
+			cfg := config.Config()
 			gh, err := cfg.GitHubClient()
 			if err != nil {
 				return err
 			}
 
 			// for all given orgs, list the repos.
-			for _, org := range cfg.Orgs() {
-				repos, err := gh.ListRepos(org)
-				if err != nil {
-					return err
-				}
-				for _, repo := range repos {
-					_, _ = fmt.Fprintln(cmd.OutOrStdout(), org+"/"+repo)
-				}
 
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "run the classifier")
-
-				classed := knative.ClassifyRepos(repos, cmd.OutOrStdout())
-				_ = classed // TODO: print from here.
+			repos, err := gh.JoinRepos(cfg.Fork(), cfg.Orgs()...)
+			if err != nil {
+				return err
+			}
+			for _, repo := range repos {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), fmt.Sprintf("%s %s %s", repo.Org, repo.Name, repo.Fork))
 			}
 
 			return nil

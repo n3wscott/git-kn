@@ -21,11 +21,14 @@ var once = sync.Once{}
 var cfg C
 var cfgErr error
 
-func Config() (C, error) {
+func Config() C {
 	once.Do(func() {
 		cfg, cfgErr = Force()
 	})
-	return cfg, cfgErr
+	if cfgErr != nil {
+		panic(cfgErr)
+	}
+	return cfg
 }
 
 func Force() (C, error) {
