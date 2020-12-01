@@ -25,34 +25,45 @@ import (
 )
 
 // ListRepos lists repos under org
-func (gc *GithubClient) ListRepos(org string) ([]string, error) {
-	repoListOptions := &github.RepositoryListOptions{}
-	genericList, err := gc.depaginate(
-		"listing repos",
-		maxRetryCount,
-		&repoListOptions.ListOptions,
-		func() ([]interface{}, *github.Response, error) {
-			page, resp, err := gc.Client.Repositories.List(ctx, org, repoListOptions)
-			var interfaceList []interface{}
-			if nil == err {
-				for _, repo := range page {
-					interfaceList = append(interfaceList, repo)
+func (gc *GithubClient) ListRepos(orgs ...string) ([]Repo, error) {
+	repos := make([]Repo, 0)
+	for _, org := range orgs {
+		repoListOptions := &github.RepositoryListOptions{}
+		genericList, err := gc.depaginate(
+			"listing repos",
+			maxRetryCount,
+			&repoListOptions.ListOptions,
+			func() ([]interface{}, *github.Response, error) {
+				page, resp, err := gc.Client.Repositories.List(ctx, org, repoListOptions)
+				var interfaceList []interface{}
+				if nil == err {
+					for _, repo := range page {
+						interfaceList = append(interfaceList, repo)
+					}
 				}
+				return interfaceList, resp, err
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, elem := range genericList {
+			r := elem.(*github.Repository)
+			if r.Archived != nil && !*r.Archived {
+				repo := Repo{
+					Org:   org,
+					Name:  r.GetName(),
+					URL:   r.GetHTMLURL(),
+					Stars: r.GetStargazersCount(),
+					Forks: r.GetForksCount(),
+				}
+				//fmt.Println(r)
+				repos = append(repos, repo)
 			}
-			return interfaceList, resp, err
-		},
-	)
-	res := make([]string, 0, len(genericList))
-	for _, elem := range genericList {
-		r := elem.(*github.Repository)
-
-		fmt.Println("is forked? ", *r.Fork)
-
-		if r.Archived != nil && !*r.Archived {
-			res = append(res, r.GetName())
 		}
 	}
-	return res, err
+	return repos, nil
 }
 
 // ListBranches lists branchs for given repo
@@ -82,6 +93,10 @@ func (gc *GithubClient) ListBranches(org, repo string) ([]*github.Branch, error)
 type Repo struct {
 	Org  string
 	Name string
+	URL  string
+
+	Stars int
+	Forks int
 
 	Fork string
 }

@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/go-github/v32/github"
 
-	"knative.dev/test-infra/pkg/ghutil"
+	"github.com/n3wscott/git-kn/pkg/ghutil"
 )
 
 // FakeGithubClient is a faked client, implements all functions of ghutil.GithubOperations

@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"knative.dev/test-infra/pkg/ghutil"
+	"github.com/n3wscott/git-kn/pkg/ghutil"
 )
 
 func addReposCmd(root *cobra.Command) {
